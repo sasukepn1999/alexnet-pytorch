@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils import data
+from torch.utils.data import Dataset, DataLoader
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
@@ -36,6 +37,35 @@ CHECKPOINT_DIR = OUTPUT_DIR + '/models'  # model checkpoints
 # make checkpoint path directory
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
+# Dataset class
+class EEGDataset(Dataset):
+    
+    # Constructor
+    def __init__(self, eeg_signals_path):
+        # Load EEG signals
+        loaded = torch.load(eeg_signals_path)
+
+        self.data = loaded['dataset']        
+        self.labels = loaded["labels"]
+        self.images = loaded["images"]
+        
+        # Compute size
+        self.size = len(self.data)
+
+    # Get size
+    def __len__(self):
+        return self.size
+
+    # Get item
+    def __getitem__(self, i):
+        # Process EEG
+        eeg = self.data[i]["eegmap"]
+
+        # Get label
+        label = self.data[i]["label"]
+        image = self.data[i]["image"]
+        # Return
+        return eeg, label, image
 
 class AlexNet(nn.Module):
     """
@@ -92,6 +122,20 @@ class AlexNet(nn.Module):
         nn.init.constant_(self.net[12].bias, 1)
 
     def forward(self, x):
+        """
+        Pass the input through the net.
+
+        Args:
+            x (Tensor): input tensor
+
+        Returns:
+            output (Tensor): output tensor
+        """
+        x = self.net(x)
+        x = x.view(-1, 256 * 6 * 6)  # reduce the dimensions for linear layer input
+        return x, self.classifier(x)
+    
+    def inference(self, x):
         """
         Pass the input through the net.
 
